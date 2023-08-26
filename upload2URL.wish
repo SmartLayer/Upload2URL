@@ -48,7 +48,9 @@ pack .f.row1.e -side left -padx 5
 
 ttk::button .f.row1.b -text "Select File" -command {
     set filePath [tk_getOpenFile]
-    set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[::http::quoteString [file tail $filePath]]"
+    ## tcl 8.5 can't do [::http::quoteString [file tail $filePath]]
+    set fakeQuery [split [::http::formatQuery file [file tail $filePath]] =]
+    set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[lindex $fakeQuery 1]"
     .f.row3.copy configure -state disabled
 }
 pack .f.row1.b -side left
