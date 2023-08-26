@@ -4,6 +4,7 @@ package require http
 package require tls
 package require ftp
 tls::init -tls1 1
+set ::ftp::VERBOSE 1
 
 # Create the main window
 wm title . "FTP File Uploader"
@@ -13,22 +14,21 @@ namespace eval ::tk::dialog::file {
     set ::tk::dialog::file::showHiddenVar 1
 }
 
-# Read .netrc for credentials for a specific machine
-proc getCredentials {machine} {
+# Read all credentials from .netrc
+proc getAllCredentials {} {
     set netrcFile [file join $::env(HOME) .netrc]
+    set credentialsList {}
     if {[file exists $netrcFile]} {
         set fileContent [read [open $netrcFile]]
         set entries [split $fileContent "\n"]
-
-        set currentMachine ""
         foreach entry $entries {
             set credential [dict create {*}$entry]
-            if {[dict exists $credential machine] && [dict get $credential machine] == $machine} {
-                return $credential
+            if {[dict exists $credential machine]} {
+                lappend credentialsList $credential
             }
         }
     }
-    throw MISSING_CREDENTIAL "Missing credential for server $machine."
+    return $credentialsList
 }
 
 # Frame for layout
@@ -50,17 +50,34 @@ ttk::button .f.row1.b -text "Select File" -command {
     set fakeQuery [split [::http::formatQuery file [file tail $filePath]] =]
     set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[lindex $fakeQuery 1]"
     pack .f.row3.e -side left -padx 5
-    .f.row3.uploadingLabel configure -text "Uploading..."
-    pack .f.row3.uploadingLabel -side left -padx 5
     pack forget .f.row4.copy
 }
 pack .f.row1.b -side left
 
-# Second row: Upload button
-ttk::button .f.upload -text "Upload" -command {
+# Second row: Server selection and Upload button
+ttk::frame .f.row2
+pack .f.row2 -fill x -pady 5
+
+# Get all credentials and populate the dropdown list
+set allCredentials [getAllCredentials]
+set serverList [list]
+foreach credential $allCredentials {
+    lappend serverList [dict get $credential machine]
+}
+
+ttk::label .f.row2.l -text "Server:"
+pack .f.row2.l -side left
+
+ttk::combobox .f.row2.serverDropdown -values $serverList -textvar selectedServer
+.f.row2.serverDropdown set [lindex $serverList 0] ;# Set the first server as default
+pack .f.row2.serverDropdown -side left -padx 5
+
+ttk::button .f.row2.upload -text "Upload" -command {
+    pack .f.row3.uploadingLabel -side left -padx 5
+    .f.row3.uploadingLabel configure -text "Uploading..."
     uploadFile $filePath
 }
-pack .f.upload -side top -pady 5
+pack .f.row2.upload -side left -padx 5
 
 # Third row: Result URL and Uploading label
 ttk::frame .f.row3
@@ -84,22 +101,22 @@ pack forget .f.row4.copy
 
 # Function to upload the file
 proc uploadFile {file} {
-    global resultURL
+    global resultURL selectedServer allCredentials
 
-    # FTP details
-    set server "server2.obble.com.au"
+    # Get the selected server's credentials
+    set selectedCredential {}
+    foreach credential $allCredentials {
+        if {[dict get $credential machine] == $selectedServer} {
+            set selectedCredential $credential
+            break
+        }
+    }
+
+    set server $selectedServer
     set fileName [file tail $file]
 
-    # Get credentials from .netrc
-    set credential [getCredentials $server]
-
-    # Initialize TLS
-    package require tls
-    tls::init -tls1 1
-    set ::ftp::VERBOSE 1
-
     # Connect to the FTP server with TLS
-    set ftp [ftp::Open $server [dict get $credential login] [dict get $credential password] -mode passive -tls 1]
+    set ftp [ftp::Open $server [dict get $selectedCredential login] [dict get $selectedCredential password] -mode passive -tls 1]
     if {$ftp == -1} {
         throw FTP_ERROR "Some error in getting FTP connection"
     }
