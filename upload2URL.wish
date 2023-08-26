@@ -22,12 +22,11 @@ proc getCredentials {machine} {
 
         set currentMachine ""
         foreach entry $entries {
-	    set credential [dict create {*}$entry]
+            set credential [dict create {*}$entry]
             if {[dict exists $credential machine] && [dict get $credential machine] == $machine} {
-		return $credential
+                return $credential
             }
         }
-
     }
     throw MISSING_CREDENTIAL "Missing credential for server $machine."
 }
@@ -48,10 +47,12 @@ pack .f.row1.e -side left -padx 5
 
 ttk::button .f.row1.b -text "Select File" -command {
     set filePath [tk_getOpenFile]
-    ## tcl 8.5 can't do [::http::quoteString [file tail $filePath]]
+    # ::http::quoteString [file tail $filePath] is a better way to escape
+    # filenames, but we aim to be compatible with tcl 8.5 so we can't use it
     set fakeQuery [split [::http::formatQuery file [file tail $filePath]] =]
     set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[lindex $fakeQuery 1]"
-    .f.row3.copy configure -state disabled
+    pack .f.row3.uploadingLabel  -side left -padx 5
+    pack forget .f.row3.copy 
 }
 pack .f.row1.b -side left
 
@@ -61,18 +62,21 @@ ttk::button .f.upload -text "Upload" -command {
 }
 pack .f.upload -side top -pady 5
 
-# Third row: Result URL and Copy button
+# Third row: Result URL, Uploading label, and Copy button
 ttk::frame .f.row3
 pack .f.row3 -fill x -pady 5
 
 ttk::entry .f.row3.e -textvar resultURL -width 60
 pack .f.row3.e -side left -padx 5
 
+label .f.row3.uploadingLabel -text "Uploading..." ;# Use standard label widget
+pack forget .f.row3.uploadingLabel ;# Initially hidden
+
 ttk::button .f.row3.copy -text "Copy to Clipboard" -command {
     clipboard clear
     clipboard append $resultURL
-} -state disabled
-pack .f.row3.copy -side left
+} -state disabled ;# Initially hidden
+pack forget .f.row3.copy
 
 # Function to upload the file
 proc uploadFile {file} {
@@ -93,7 +97,7 @@ proc uploadFile {file} {
     # Connect to the FTP server with TLS
     set ftp [ftp::Open $server [dict get $credential login] [dict get $credential password] -mode passive -tls 1]
     if {$ftp == -1} {
-	    throw FTP_ERROR "Some error in getting FTP connection"
+        throw FTP_ERROR "Some error in getting FTP connection"
     }
     # Upload the file
     ftp::Put $ftp $file $fileName
@@ -101,7 +105,9 @@ proc uploadFile {file} {
     # Close the connection
     ftp::Close $ftp
 
-    # Enable the copy button
+    # Hide the uploading label and show the copy button
+    pack forget .f.row3.uploadingLabel
+    pack .f.row3.copy -side left -padx 5
     .f.row3.copy configure -state normal
 }
 
