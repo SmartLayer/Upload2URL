@@ -1,0 +1,94 @@
+#!/usr/bin/wish
+
+package require TclCurl
+package require http
+
+# Create the main window
+wm title . "FTP File Uploader"
+
+namespace eval ::tk::dialog::file {
+    set ::tk::dialog::file::showHiddenBtn 0
+    set ::tk::dialog::file::showHiddenVar 1
+}
+
+# Read .netrc for credentials for a specific machine
+proc getCredentials {machine} {
+    set netrcFile [file join $::env(HOME) .netrc]
+    if {[file exists $netrcFile]} {
+        set fileContent [read [open $netrcFile]]
+        set entries [split $fileContent "\n"]
+
+        set currentMachine ""
+        foreach entry $entries {
+	    set credential [dict create {*}$entry]
+            if {[dict exists $credential machine] && [dict get $credential machine] == $machine} {
+		return $credential
+            }
+        }
+
+    }
+    throw MISSING_CREDENTIAL "Missing credential for server $machine."
+}
+
+# Frame for layout
+ttk::frame .f
+pack .f -fill both -expand true -padx 10 -pady 10
+
+# First row: File selection
+ttk::frame .f.row1
+pack .f.row1 -fill x -pady 5
+
+ttk::label .f.row1.l -text "File:"
+pack .f.row1.l -side left
+
+ttk::entry .f.row1.e -textvar filePath -state readonly -width 40
+pack .f.row1.e -side left -padx 5
+
+ttk::button .f.row1.b -text "Select File" -command {
+    set filePath [tk_getOpenFile]
+    set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[::http::quoteString [file tail $filePath]]"
+    .f.row3.copy configure -state disabled
+}
+pack .f.row1.b -side left
+
+# Second row: Upload button
+ttk::button .f.upload -text "Upload" -command {
+    uploadFile $filePath
+}
+pack .f.upload -side top -pady 5
+
+# Third row: Result URL and Copy button
+ttk::frame .f.row3
+pack .f.row3 -fill x -pady 5
+
+ttk::entry .f.row3.e -textvar resultURL -width 60
+pack .f.row3.e -side left -padx 5
+
+ttk::button .f.row3.copy -text "Copy to Clipboard" -command {
+    clipboard clear
+    clipboard append $resultURL
+} -state disabled
+pack .f.row3.copy -side left
+
+# Function to upload the file
+proc uploadFile {file} {
+    global resultURL
+
+    # FTP details
+    set server "server2.obble.com.au"
+    set fileName [file tail $file]
+
+    # Get credentials from .netrc
+    set credential [getCredentials $server]
+
+    # Upload the file using TclCurl
+    curl::transfer -url ftp://$server/$fileName \
+        -infilesize [file size $file] -infile $file -upload 1 \
+        -username [dict get $credential login] -password [dict get $credential password] -verbose 1
+
+    # Enable the copy button
+    .f.row3.copy configure -state normal
+}
+
+# Initialize resultURL to be empty
+set resultURL ""
