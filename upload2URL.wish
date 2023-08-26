@@ -47,12 +47,12 @@ pack .f.row1.e -side left -padx 5
 
 ttk::button .f.row1.b -text "Select File" -command {
     set filePath [tk_getOpenFile]
-    # ::http::quoteString [file tail $filePath] is a better way to escape
-    # filenames, but we aim to be compatible with tcl 8.5 so we can't use it
     set fakeQuery [split [::http::formatQuery file [file tail $filePath]] =]
     set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[lindex $fakeQuery 1]"
-    pack .f.row3.uploadingLabel  -side left -padx 5
-    pack forget .f.row3.copy 
+    pack .f.row3.e -side left -padx 5
+    .f.row3.uploadingLabel configure -text "Uploading..."
+    pack .f.row3.uploadingLabel -side left -padx 5
+    pack forget .f.row4.copy
 }
 pack .f.row1.b -side left
 
@@ -62,21 +62,25 @@ ttk::button .f.upload -text "Upload" -command {
 }
 pack .f.upload -side top -pady 5
 
-# Third row: Result URL, Uploading label, and Copy button
+# Third row: Result URL and Uploading label
 ttk::frame .f.row3
 pack .f.row3 -fill x -pady 5
 
 ttk::entry .f.row3.e -textvar resultURL -width 60
-pack .f.row3.e -side left -padx 5
+pack forget .f.row3.e ;# Initially hidden
 
 label .f.row3.uploadingLabel -text "Uploading..." ;# Use standard label widget
 pack forget .f.row3.uploadingLabel ;# Initially hidden
 
-ttk::button .f.row3.copy -text "Copy to Clipboard" -command {
+# Fourth row: Copy button
+ttk::frame .f.row4
+pack .f.row4 -fill x -pady 5
+
+ttk::button .f.row4.copy -text "Copy to Clipboard" -command {
     clipboard clear
     clipboard append $resultURL
 } -state disabled ;# Initially hidden
-pack forget .f.row3.copy
+pack forget .f.row4.copy
 
 # Function to upload the file
 proc uploadFile {file} {
@@ -105,10 +109,10 @@ proc uploadFile {file} {
     # Close the connection
     ftp::Close $ftp
 
-    # Hide the uploading label and show the copy button
-    pack forget .f.row3.uploadingLabel
-    pack .f.row3.copy -side left -padx 5
-    .f.row3.copy configure -state normal
+    # Update the uploading label and show the copy button
+    .f.row3.uploadingLabel configure -text "Done"
+    pack .f.row4.copy -side left -padx 5
+    .f.row4.copy configure -state normal
 }
 
 # Initialize resultURL to be empty
