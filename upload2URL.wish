@@ -1,7 +1,9 @@
 #!/usr/bin/wish
 
-package require TclCurl
 package require http
+package require tls
+package require ftp
+tls::init -tls1 1
 
 # Create the main window
 wm title . "FTP File Uploader"
@@ -81,10 +83,21 @@ proc uploadFile {file} {
     # Get credentials from .netrc
     set credential [getCredentials $server]
 
-    # Upload the file using TclCurl
-    curl::transfer -url ftp://$server/$fileName \
-        -infilesize [file size $file] -infile $file -upload 1 \
-        -username [dict get $credential login] -password [dict get $credential password] -verbose 1
+    # Initialize TLS
+    package require tls
+    tls::init -tls1 1
+    set ::ftp::VERBOSE 1
+
+    # Connect to the FTP server with TLS
+    set ftp [ftp::Open $server [dict get $credential login] [dict get $credential password] -mode passive -tls 1]
+    if {$ftp == -1} {
+	    throw FTP_ERROR "Some error in getting FTP connection"
+    }
+    # Upload the file
+    ftp::Put $ftp $file $fileName
+
+    # Close the connection
+    ftp::Close $ftp
 
     # Enable the copy button
     .f.row3.copy configure -state normal
