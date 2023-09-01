@@ -6,14 +6,6 @@ package require ftp
 tls::init -tls1 1
 set ::ftp::VERBOSE 1
 
-# Create the main window
-wm title . "FTP File Uploader"
-
-namespace eval ::tk::dialog::file {
-    set ::tk::dialog::file::showHiddenBtn 0
-    set ::tk::dialog::file::showHiddenVar 1
-}
-
 # Read all credentials from .netrc
 proc getAllCredentials {} {
     set netrcFile [file join $::env(HOME) .netrc]
@@ -31,106 +23,140 @@ proc getAllCredentials {} {
     return $credentialsList
 }
 
-# Frame for layout
-ttk::frame .f
-pack .f -fill both -expand true -padx 10 -pady 10
+# Render the main UI
+proc renderMainUI {allCredentials} {
+    # Create the main window
+    wm title . "FTP File Uploader"
 
-# First row: File selection
-ttk::frame .f.row1
-pack .f.row1 -fill x -pady 5
+    namespace eval ::tk::dialog::file {
+        set ::tk::dialog::file::showHiddenBtn 0
+        set ::tk::dialog::file::showHiddenVar 1
+    }
 
-ttk::label .f.row1.l -text "File:"
-pack .f.row1.l -side left
+    # Frame for layout
 
-ttk::entry .f.row1.e -textvar filePath -state readonly -width 40
-pack .f.row1.e -side left -padx 5
+    # First row: File selection
+    ttk::frame .f.row1
+    pack .f.row1 -fill x -pady 5
 
-ttk::button .f.row1.b -text "Select File" -command {
-    set filePath [tk_getOpenFile]
-    set fakeQuery [split [::http::formatQuery file [file tail $filePath]] =]
-    set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[lindex $fakeQuery 1]"
-    pack .f.row3.e -side left -padx 5
-    pack forget .f.row4.copy
-}
-pack .f.row1.b -side left
+    ttk::label .f.row1.l -text "File:"
+    pack .f.row1.l -side left
 
-# Second row: Server selection and Upload button
-ttk::frame .f.row2
-pack .f.row2 -fill x -pady 5
+    ttk::entry .f.row1.e -textvar filePath -state readonly -width 40
+    pack .f.row1.e -side left -padx 5
 
-# Get all credentials and populate the dropdown list
-set allCredentials [getAllCredentials]
-set serverList [list]
-foreach credential $allCredentials {
-    lappend serverList [dict get $credential machine]
-}
+    ttk::button .f.row1.b -text "Select File" -command {
+	set filePath [tk_getOpenFile]
+	set fakeQuery [split [::http::formatQuery file [file tail $filePath]] =]
+	set resultURL "https://computer.graphic.and.cryptographic.technology/ann/[lindex $fakeQuery 1]"
+	pack .f.row3.e -side left -padx 5
+	pack forget .f.row4.copy
+    }
+    pack .f.row1.b -side left
 
-ttk::label .f.row2.l -text "Server:"
-pack .f.row2.l -side left
+    # Second row: Server selection and Upload button
+    ttk::frame .f.row2
+    pack .f.row2 -fill x -pady 5
 
-ttk::combobox .f.row2.serverDropdown -values $serverList -textvar selectedServer
-.f.row2.serverDropdown set [lindex $serverList 0] ;# Set the first server as default
-pack .f.row2.serverDropdown -side left -padx 5
-
-ttk::button .f.row2.upload -text "Upload" -command {
-    pack .f.row3.uploadingLabel -side left -padx 5
-    .f.row3.uploadingLabel configure -text "Uploading..."
-    uploadFile $filePath
-}
-pack .f.row2.upload -side left -padx 5
-
-# Third row: Result URL and Uploading label
-ttk::frame .f.row3
-pack .f.row3 -fill x -pady 5
-
-ttk::entry .f.row3.e -textvar resultURL -width 60
-pack forget .f.row3.e ;# Initially hidden
-
-label .f.row3.uploadingLabel -text "Uploading..." ;# Use standard label widget
-pack forget .f.row3.uploadingLabel ;# Initially hidden
-
-# Fourth row: Copy button
-ttk::frame .f.row4
-pack .f.row4 -fill x -pady 5
-
-ttk::button .f.row4.copy -text "Copy to Clipboard" -command {
-    clipboard clear
-    clipboard append $resultURL
-} -state disabled ;# Initially hidden
-pack forget .f.row4.copy
-
-# Function to upload the file
-proc uploadFile {file} {
-    global resultURL selectedServer allCredentials
-
-    # Get the selected server's credentials
-    set selectedCredential {}
+    # Get all credentials and populate the dropdown list
+    set serverList [list]
     foreach credential $allCredentials {
-        if {[dict get $credential machine] == $selectedServer} {
-            set selectedCredential $credential
-            break
+	lappend serverList [dict get $credential machine]
+    }
+
+    ttk::label .f.row2.l -text "Server:"
+    pack .f.row2.l -side left
+
+    ttk::combobox .f.row2.serverDropdown -values $serverList -textvar selectedServer
+    .f.row2.serverDropdown set [lindex $serverList 0] ;# Set the first server as default
+    pack .f.row2.serverDropdown -side left -padx 5
+
+    ttk::button .f.row2.upload -text "Upload" -command {
+	pack .f.row3.uploadingLabel -side left -padx 5
+	.f.row3.uploadingLabel configure -text "Uploading..."
+	uploadFile $filePath
+    }
+    pack .f.row2.upload -side left -padx 5
+
+    # Third row: Result URL and Uploading label
+    ttk::frame .f.row3
+    pack .f.row3 -fill x -pady 5
+
+    ttk::entry .f.row3.e -textvar resultURL -width 60
+    pack forget .f.row3.e ;# Initially hidden
+
+    label .f.row3.uploadingLabel -text "Uploading..." ;# Use standard label widget
+    pack forget .f.row3.uploadingLabel ;# Initially hidden
+
+    # Fourth row: Copy button
+    ttk::frame .f.row4
+    pack .f.row4 -fill x -pady 5
+
+    ttk::button .f.row4.copy -text "Copy to Clipboard" -command {
+	clipboard clear
+	clipboard append $resultURL
+    } -state disabled ;# Initially hidden
+    pack forget .f.row4.copy
+
+    # Function to upload the file
+    proc uploadFile {file} {
+	global resultURL selectedServer allCredentials
+
+	# Get the selected server's credentials
+	set selectedCredential {}
+	foreach credential $allCredentials {
+	    if {[dict get $credential machine] == $selectedServer} {
+		set selectedCredential $credential
+		break
+	    }
+	}
+
+	set server $selectedServer
+	set fileName [file tail $file]
+
+	# Connect to the FTP server with TLS
+	set ftp [ftp::Open $server [dict get $selectedCredential login] [dict get $selectedCredential password] -mode passive -tls 1]
+	if {$ftp == -1} {
+	    throw FTP_ERROR "Some error in getting FTP connection"
+	}
+	# Upload the file
+	ftp::Put $ftp $file $fileName
+
+	# Close the connection
+	ftp::Close $ftp
+
+	# Update the uploading label and show the copy button
+	.f.row3.uploadingLabel configure -text "Done"
+	pack .f.row4.copy -side left -padx 5
+	.f.row4.copy configure -state normal
+    }
+
+    # Initialize resultURL to be empty
+    set resultURL ""
+}
+
+# Render the .netrc missing UI
+proc renderNetrcMissingUI {} {
+    ttk::label .f.missingNetrcLabel -text "The .netrc file was not found or has no credentials in it. Please provide one in order to use this app."
+    pack .f.missingNetrcLabel -side top -pady 10
+
+    ttk::button .f.recheckButton -text "Recheck" -command {
+        set allCredentials [getAllCredentials]
+        if {[llength $allCredentials] > 0} {
+            pack forget .f.missingNetrcLabel
+            pack forget .f.recheckButton
+            renderMainUI $allCredentials
         }
     }
-
-    set server $selectedServer
-    set fileName [file tail $file]
-
-    # Connect to the FTP server with TLS
-    set ftp [ftp::Open $server [dict get $selectedCredential login] [dict get $selectedCredential password] -mode passive -tls 1]
-    if {$ftp == -1} {
-        throw FTP_ERROR "Some error in getting FTP connection"
-    }
-    # Upload the file
-    ftp::Put $ftp $file $fileName
-
-    # Close the connection
-    ftp::Close $ftp
-
-    # Update the uploading label and show the copy button
-    .f.row3.uploadingLabel configure -text "Done"
-    pack .f.row4.copy -side left -padx 5
-    .f.row4.copy configure -state normal
+    pack .f.recheckButton -side top -pady 10
 }
 
-# Initialize resultURL to be empty
-set resultURL ""
+# Main script
+ttk::frame .f
+pack .f -fill both -expand true -padx 10 -pady 10
+set allCredentials [getAllCredentials]
+if {[llength $allCredentials] > 0} {
+    renderMainUI $allCredentials
+} else {
+    renderNetrcMissingUI
+}
